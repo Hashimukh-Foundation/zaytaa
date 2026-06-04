@@ -1,0 +1,75 @@
+@import url("https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&family=Playfair+Display:ital,wght@0,700;0,800;1,700&display=swap");
+
+:root {
+	--green: #83a286; /* The soft sage green */
+	--green-light: #eef2ef; /* Newsletter & Hero background */
+	--ink: #1c1c1c; /* Deep charcoal for text */
+	--stone: #888888; /* Muted gray for subtitles */
+	--white: #fcfbf8;
+	--border: #f0f0f0;
+
+	--font-serif: "Playfair Display", serif;
+	--font-sans: "Jost", sans-serif;
+}
+
+body {
+	background-color: var(--white);
+	color: var(--ink);
+	font-family: var(--font-sans);
+	margin: 0;
+	padding: 0;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* --- Mobile Responsiveness --- */
+
+/* Hide center nav links on small screens to prevent overlap */
+@media (max-width: 768px) {
+	.nav-center {
+		display: none !important;
+	}
+
+	/* Stack newsletter input on mobile */
+	.newsletter-input-group {
+		flex-direction: column;
+		border-radius: 16px !important;
+		background: transparent !important;
+		box-shadow: none !important;
+		gap: 12px;
+	}
+
+	.newsletter-input-group input {
+		background: var(--white) !important;
+		border-radius: 100px;
+	}
+}
+
+/* product card hover interactions */
+.product-card-image {
+	transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+a:hover .product-card-image {
+	transform: scale(1.04);
+}
+
+.product-card-wishlist,
+.product-card-overlay {
+	opacity: 0;
+	transform: translateY(-4px);
+	transition:
+		opacity 0.25s ease,
+		transform 0.25s ease;
+}
+a:hover .product-card-wishlist,
+a:hover .product-card-overlay {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.product-card-wishlist:hover {
+	background: rgba(255, 255, 255, 0.98) !important;
+}
+.product-card-overlay button:hover {
+	background: var(--ink) !important;
+	color: #f4f3f0 !important;
+}
