@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import ProductCard from "../components/ProductCard";
-import Navbar from "../components/Navbar"; // ---> NEW: Import Navbar
-import Footer from "../components/Footer"; // ---> NEW: Import Footer
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
+import { useCart } from "../context/CartContext";
 
 export default function ProductPage() {
 	const { slug } = useParams();
@@ -86,7 +87,6 @@ export default function ProductPage() {
 		window.scrollTo(0, 0);
 	}, [slug]);
 
-	// --- Helper to render the main content block cleanly ---
 	const renderContent = () => {
 		if (loading)
 			return <div style={styles.centerBox}>[ LOADING PRODUCT... ]</div>;
@@ -121,9 +121,22 @@ export default function ProductPage() {
 					).toFixed(1)
 				: 0;
 
-		const handleAddToCart = () => {
-			if (activeStock < quantity) return alert("Not enough stock available!");
-			alert(`Added ${quantity} x ${product.name} to cart!`);
+		const { addToCart } = useCart();
+
+		const [isAdded, setIsAdded] = useState(false);
+
+		const handleAddToCart = (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+
+			// Simple check before adding
+			if (product.stock_quantity > 0) {
+				addToCart(product, product.product_variants?.[0] || null, 1);
+				setIsAdded(true);
+				setTimeout(() => setIsAdded(false), 2000); // Revert after 2s
+			} else {
+				alert("Out of stock!");
+			}
 		};
 
 		return (
@@ -264,7 +277,7 @@ export default function ProductPage() {
 
 						<div
 							style={{
-								marginBottom: "24px",
+								marginBottom: "32px",
 								fontFamily: "var(--font-sans)",
 								fontSize: "14px",
 							}}
@@ -368,13 +381,9 @@ export default function ProductPage() {
 							<div style={styles.detailSection}>
 								<h3 style={styles.sectionTitle}>Shipping & Returns</h3>
 								<div style={styles.bodyText}>
-									<p style={{ marginBottom: "8px" }}>
+									<p style={{ marginBottom: "12px" }}>
 										<strong style={styles.boldPop}>Standard Shipping:</strong>{" "}
 										3-5 business days.
-									</p>
-									<p style={{ marginBottom: "8px" }}>
-										<strong style={styles.boldPop}>Express Shipping:</strong>{" "}
-										1-2 business days.
 									</p>
 									<div style={styles.returnCallout}>
 										<strong style={styles.boldPop}>30-Day Guarantee:</strong> We
@@ -400,7 +409,7 @@ export default function ProductPage() {
 										style={{
 											display: "flex",
 											flexDirection: "column",
-											gap: "20px",
+											gap: "24px",
 										}}
 									>
 										{product.reviews.map((rev) => (
@@ -410,7 +419,7 @@ export default function ProductPage() {
 														display: "flex",
 														justifyContent: "space-between",
 														alignItems: "center",
-														marginBottom: "8px",
+														marginBottom: "12px",
 													}}
 												>
 													<strong
@@ -434,7 +443,7 @@ export default function ProductPage() {
 														margin: 0,
 														fontSize: "15px",
 														color: "var(--stone)",
-														lineHeight: 1.5,
+														lineHeight: 1.8,
 													}}
 												>
 													"{rev.comment}"
@@ -453,9 +462,9 @@ export default function ProductPage() {
 						<h2
 							style={{
 								fontFamily: "var(--font-serif)",
-								fontSize: "28px",
+								fontSize: "32px",
 								color: "var(--ink)",
-								marginBottom: "32px",
+								marginBottom: "40px",
 								textAlign: "center",
 							}}
 						>
@@ -478,7 +487,6 @@ export default function ProductPage() {
 		);
 	};
 
-	// ---> NEW: Render the page with Navbar at the top and Footer at the bottom <---
 	return (
 		<>
 			<Navbar />
@@ -541,7 +549,7 @@ const styles = {
 	crumb: { color: "var(--stone)", textDecoration: "none" },
 	grid: {
 		display: "grid",
-		gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
+		gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", // Adjusted to prevent awkward gaps with smaller image
 		gap: "64px",
 		alignItems: "start",
 	},
@@ -550,8 +558,9 @@ const styles = {
 		display: "flex",
 		flexDirection: "column",
 		gap: "16px",
-		position: "sticky",
-		top: "100px",
+		maxWidth: "360px", // ---> CHANGED: Much smaller image width
+		width: "100%",
+		margin: "0 auto",
 	},
 	mainImageContainer: {
 		width: "100%",
@@ -614,10 +623,10 @@ const styles = {
 	},
 	title: {
 		fontFamily: "var(--font-serif)",
-		fontSize: "40px",
+		fontSize: "36px",
 		margin: "0 0 16px 0",
 		color: "var(--ink)",
-		lineHeight: 1.1,
+		lineHeight: 1.2,
 	},
 	priceContainer: {
 		display: "flex",
@@ -698,16 +707,16 @@ const styles = {
 	detailsContainer: {
 		display: "flex",
 		flexDirection: "column",
-		gap: "40px",
+		gap: "48px",
 		borderTop: "2px solid var(--border)",
-		paddingTop: "40px",
+		paddingTop: "48px",
 	},
 	detailSection: {
 		display: "flex",
 		flexDirection: "column",
-		gap: "16px",
+		gap: "20px",
 		borderBottom: "1px solid var(--border)",
-		paddingBottom: "40px",
+		paddingBottom: "48px",
 	},
 	sectionTitle: {
 		fontFamily: "var(--font-serif)",
@@ -719,8 +728,10 @@ const styles = {
 		fontFamily: "var(--font-sans)",
 		fontSize: "16px",
 		color: "var(--stone)",
-		lineHeight: 1.6,
+		lineHeight: 1.8,
+		letterSpacing: "0.02em",
 		margin: 0,
+		whiteSpace: "pre-wrap",
 	},
 	boldPop: { color: "var(--ink)", fontWeight: 700 },
 
@@ -728,11 +739,11 @@ const styles = {
 		background: "#fcfbf8",
 		border: "1px solid var(--border)",
 		borderRadius: "6px",
-		padding: "16px",
+		padding: "20px",
 		display: "flex",
 		flexDirection: "column",
 		gap: "12px",
-		marginTop: "8px",
+		marginTop: "12px",
 	},
 	highlightRow: { display: "flex", gap: "8px", alignItems: "baseline" },
 	highlightLabel: {
@@ -753,24 +764,25 @@ const styles = {
 
 	returnCallout: {
 		marginTop: "16px",
-		padding: "16px",
+		padding: "20px",
 		background: "rgba(201, 64, 64, 0.05)",
 		borderLeft: "4px solid #c94040",
 		color: "var(--ink)",
 		fontSize: "15px",
+		lineHeight: 1.6,
 		borderRadius: "0 4px 4px 0",
 	},
 
 	reviewCard: {
 		background: "#fff",
 		border: "1px solid var(--border)",
-		padding: "20px",
+		padding: "24px",
 		borderRadius: "8px",
 	},
 
 	relatedSection: {
-		marginTop: "80px",
-		paddingTop: "80px",
+		marginTop: "24px", // ---> CHANGED: Slashed the massive gap
+		paddingTop: "40px", // ---> CHANGED: Reduced padding
 		borderTop: "1px solid var(--border)",
 	},
 };

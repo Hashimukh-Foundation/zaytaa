@@ -1,46 +1,55 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useSettings } from "../context/SettingsContext";
+import { supabase } from "../supabaseClient"; // Make sure your path is correct!
 
 export default function Hero() {
-	const { settings } = useSettings();
-	const [current, setCurrent] = useState(0);
+	// 1. Set up the state using the keys we created in the admin panel
+	const [heroSettings, setHeroSettings] = useState({
+		home_title: "Skin that remembers itself.",
+		home_subtitle:
+			"Dear Sweetheart, can you inspire me to commit such a suicide?",
+	});
 
-	const slides = [
-		{
-			eyebrow: settings.hero_1_eyebrow || "INTRODUCING — THE PURITY COLLECTION",
-			line1: settings.hero_1_heading_1 || "Skin that",
-			accent: settings.hero_1_heading_2 || "remembers",
-			line3: settings.hero_1_heading_3 || "itself.",
-			subtext:
-				// settings.hero_1_subtext ||
-				"Dear Sweetheart, can you inspire me to commit such a suicide?",
-			btn1: { label: "Shop Now", url: "/shop" },
-			btn2: { label: "Learn More", url: "/about" },
-			bg: "var(--white)",
-		},
-	];
+	// 2. Fetch the data from Supabase on load
+	useEffect(() => {
+		async function fetchSettings() {
+			const { data } = await supabase
+				.from("site_settings")
+				.select("key, value");
 
-	const slide = slides[current];
+			if (data) {
+				const settingsMap = data.reduce((acc, row) => {
+					acc[row.key] = row.value;
+					return acc;
+				}, {});
 
+				setHeroSettings({
+					home_title:
+						settingsMap["home_title"] || "Skin that remembers itself.",
+					home_subtitle:
+						settingsMap["home_subtitle"] ||
+						"Dear Sweetheart, can you inspire me to commit such a suicide?",
+				});
+			}
+		}
+		fetchSettings();
+	}, []);
+
+	// 3. Render the fetched data directly into the HTML
 	return (
-		<section style={{ ...styles.section, backgroundColor: slide.bg }}>
-			<p style={styles.eyebrow}>{slide.eyebrow}</p>
+		<section style={{ ...styles.section, backgroundColor: "var(--white)" }}>
+			<p style={styles.eyebrow}>INTRODUCING — THE PURITY COLLECTION</p>
 
-			<h1 style={styles.heading}>
-				{slide.line1} <em style={styles.accent}>{slide.accent}</em>
-				<br />
-				{slide.line3}
-			</h1>
+			<h1 style={styles.heading}>{heroSettings.home_title}</h1>
 
-			<p style={styles.subtext}>{slide.subtext}</p>
+			<p style={styles.subtext}>{heroSettings.home_subtitle}</p>
 
 			<div style={styles.buttonContainer}>
-				<Link to={slide.btn1.url} style={styles.btnPrimary}>
-					{slide.btn1.label}
+				<Link to="/shop" style={styles.btnPrimary}>
+					Shop Now
 				</Link>
-				<Link to={slide.btn2.url} style={styles.btnSecondary}>
-					{slide.btn2.label}
+				<Link to="/about" style={styles.btnSecondary}>
+					Learn More
 				</Link>
 			</div>
 		</section>
@@ -49,7 +58,6 @@ export default function Hero() {
 
 const styles = {
 	section: {
-		// Removed fixed minHeight so it conforms exactly to its content
 		padding: "60px 24px",
 		display: "flex",
 		flexDirection: "column",
@@ -63,36 +71,32 @@ const styles = {
 		fontSize: "11px",
 		letterSpacing: "0.15em",
 		color: "var(--stone)",
-		marginBottom: "16px", // Reduced from 32px
+		marginBottom: "16px",
 		textTransform: "uppercase",
 	},
 	heading: {
 		fontFamily: "var(--font-serif)",
-		fontSize: "clamp(48px, 8vw, 100px)", // Tweaked clamp for better mobile fit
+		fontSize: "clamp(48px, 8vw, 100px)",
 		fontWeight: 800,
 		lineHeight: 1.05,
 		color: "var(--ink)",
 		maxWidth: "900px",
-		marginBottom: "20px", // Reduced from 32px
-	},
-	accent: {
-		color: "var(--green)",
-		fontStyle: "italic",
+		marginBottom: "20px",
 	},
 	subtext: {
 		fontFamily: "var(--font-sans)",
-		fontSize: "clamp(15px, 3vw, 18px)", // Responsive subtext
+		fontSize: "clamp(15px, 3vw, 18px)",
 		fontWeight: 300,
 		color: "var(--stone)",
 		maxWidth: "540px",
 		lineHeight: 1.6,
-		marginBottom: "32px", // Reduced from 48px
+		marginBottom: "32px",
 	},
 	buttonContainer: {
 		display: "flex",
 		gap: "12px",
 		justifyContent: "center",
-		flexWrap: "wrap", // Allows buttons to stack on very narrow phone screens
+		flexWrap: "wrap",
 	},
 	btnPrimary: {
 		background: "var(--green)",

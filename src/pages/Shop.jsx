@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "../supabaseClient";
-import ProductCard from "../components/ProductCard";
+import ShopProductCard from "../components/ShopProductCard";
 
 export default function Shop() {
 	const [searchParams, setSearchParams] = useSearchParams();
+
+	// --- Store Settings State ---
+	const [storeSettings, setStoreSettings] = useState({
+		shop_title: "Shop All",
+		shop_subtitle: "Discover your perfect routine",
+	});
 
 	// --- Data States ---
 	const [allProducts, setAllProducts] = useState([]);
@@ -58,6 +64,24 @@ export default function Shop() {
 		async function fetchEverything() {
 			setLoading(true);
 
+			// Fetch Site Settings
+			const { data: settings } = await supabase
+				.from("site_settings")
+				.select("key, value");
+			if (settings) {
+				const settingsMap = settings.reduce((acc, row) => {
+					acc[row.key] = row.value;
+					return acc;
+				}, {});
+
+				setStoreSettings({
+					shop_title: settingsMap["shop_title"] || "Shop All",
+					shop_subtitle:
+						settingsMap["shop_subtitle"] || "Discover your perfect routine",
+				});
+			}
+
+			// Fetch Filter Data
 			const { data: brands } = await supabase
 				.from("brands")
 				.select("slug, name");
@@ -71,13 +95,14 @@ export default function Shop() {
 			if (cats) setCategoriesList(cats);
 			if (skins) setSkinTypesList(skins);
 
+			// Fetch Products
 			const { data: products, error } = await supabase.from("products").select(`
                     id, name, slug, price, sale_price, created_at, is_bestseller, is_new_arrival, is_featured,
                     brands ( slug, name ),
                     product_images ( url, is_primary ),
                     product_categories ( categories ( slug, name ) ),
                     product_skin_types ( skin_types ( slug, name ) ),
-                    product_variants ( price, sale_price )
+                    product_variants ( name, price, sale_price )
                 `);
 
 			if (error) {
@@ -181,7 +206,6 @@ export default function Shop() {
 
 	return (
 		<main style={styles.pageWrapper}>
-			{/* CSS Injection for beautiful responsiveness and custom scrollbars */}
 			<style>{`
                 .shop-layout { display: flex; flex-direction: column; gap: 32px; }
                 .sidebar-wrapper { width: 100%; }
@@ -210,12 +234,11 @@ export default function Shop() {
             `}</style>
 
 			<div style={styles.header}>
-				<h1 style={styles.title}>Shop All</h1>
-				<p style={styles.subtitle}>Discover your perfect routine</p>
+				<h1 style={styles.title}>{storeSettings.shop_title}</h1>
+				<p style={styles.subtitle}>{storeSettings.shop_subtitle}</p>
 			</div>
 
 			<div className="shop-layout">
-				{/* LEFT AREA: SIDEBAR (Now wrapped properly so it doesn't break flexbox on desktop) */}
 				<div className="sidebar-wrapper">
 					<button
 						className="mobile-filter-btn"
@@ -322,9 +345,7 @@ export default function Shop() {
 					</aside>
 				</div>
 
-				{/* RIGHT AREA: PRODUCT GRID */}
 				<div style={{ flex: 1, minWidth: 0 }}>
-					{/* Search and Sort Row */}
 					<div className="top-bar-controls">
 						<div className="search-wrapper">
 							<input
@@ -353,7 +374,6 @@ export default function Shop() {
 						</div>
 					</div>
 
-					{/* Grid */}
 					{loading ? (
 						<div style={styles.emptyState}>[ LOADING CATALOG... ]</div>
 					) : filteredProducts.length === 0 ? (
@@ -370,7 +390,7 @@ export default function Shop() {
 					) : (
 						<div className="shop-grid">
 							{filteredProducts.map((product) => (
-								<ProductCard key={product.id} product={product} />
+								<ShopProductCard key={product.id} product={product} />
 							))}
 						</div>
 					)}

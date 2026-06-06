@@ -4,6 +4,7 @@ import { supabase } from "../../supabaseClient";
 import AdminCategories from "./AdminCategories";
 import AdminProducts from "./AdminProducts";
 import AdminBrands from "./AdminBrands";
+import AdminSettings from "./AdminSettings";
 
 export default function AdminDashboard() {
 	const { user, signOut } = useAuth();
@@ -74,6 +75,8 @@ export default function AdminDashboard() {
 				return <AdminCategories />;
 			case "brands":
 				return <AdminBrands />;
+			case "settings":
+				return <AdminSettings />;
 			default:
 				return <div>Select a tab</div>;
 		}
@@ -124,6 +127,15 @@ export default function AdminDashboard() {
 						onClick={() => setActiveTab("brands")}
 					>
 						Brands
+					</button>
+					<button
+						style={{
+							...styles.navButton,
+							...(activeTab === "settings" ? styles.activeTab : {}),
+						}}
+						onClick={() => setActiveTab("settings")}
+					>
+						Settings
 					</button>
 				</nav>
 
