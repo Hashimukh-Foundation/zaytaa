@@ -11,7 +11,8 @@ export default function ProductPage() {
 	const [product, setProduct] = useState(null);
 	const [relatedProducts, setRelatedProducts] = useState([]);
 	const [loading, setLoading] = useState(true);
-
+	const { addToCart } = useCart();
+	const [isAdded, setIsAdded] = useState(false);
 	// UI States
 	const [selectedImage, setSelectedImage] = useState("");
 	const [quantity, setQuantity] = useState(1);
@@ -120,10 +121,6 @@ export default function ProductPage() {
 						totalReviews
 					).toFixed(1)
 				: 0;
-
-		const { addToCart } = useCart();
-
-		const [isAdded, setIsAdded] = useState(false);
 
 		const handleAddToCart = (e) => {
 			e.preventDefault();
