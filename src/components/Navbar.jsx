@@ -77,7 +77,8 @@ export default function Navbar() {
 		{ label: "Shop All", url: "/shop" },
 		{ label: "Bestsellers", url: "/shop?bestseller=true" },
 		{ label: "New Arrivals", url: "/shop?newarrival=true" },
-		{ label: "About", url: "/about" },
+		{ label: "Track Order", url: "/track-order" },
+		{ label: "About", url: "/product/overnight-resurfacing-peel" },
 	];
 
 	return (

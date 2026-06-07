@@ -90,14 +90,14 @@ export default function ProductCard({ product }) {
 						{isSale ? (
 							<>
 								<span style={styles.originalPrice}>
-									${lowestOriginalPrice.toFixed(2)}
+									৳{lowestOriginalPrice.toFixed(2)}
 								</span>
 								<span style={styles.salePrice}>
-									${lowestActivePrice.toFixed(2)}
+									৳{lowestActivePrice.toFixed(2)}
 								</span>
 							</>
 						) : (
-							<span style={styles.price}>${lowestActivePrice.toFixed(2)}</span>
+							<span style={styles.price}>৳{lowestActivePrice.toFixed(2)}</span>
 						)}
 					</div>
 				</div>

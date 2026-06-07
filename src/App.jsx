@@ -15,6 +15,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import CustomerLogin from "./pages/CustomerLogin";
 import { CartProvider } from "./context/CartContext";
 import Checkout from "./pages/Checkout";
+import TrackOrder from "./pages/TrackOrder";
 
 function App() {
 	return (
@@ -33,6 +34,7 @@ function App() {
 										<Route path="/" element={<Home />} />
 										<Route path="/shop" element={<Shop />} />
 										<Route path="/checkout" element={<Checkout />} />
+										<Route path="/track-order" element={<TrackOrder />} />
 									</Routes>
 									<Footer />
 								</>

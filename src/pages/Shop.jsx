@@ -97,13 +97,13 @@ export default function Shop() {
 
 			// Fetch Products
 			const { data: products, error } = await supabase.from("products").select(`
-                    id, name, slug, price, sale_price, created_at, is_bestseller, is_new_arrival, is_featured,
-                    brands ( slug, name ),
-                    product_images ( url, is_primary ),
-                    product_categories ( categories ( slug, name ) ),
-                    product_skin_types ( skin_types ( slug, name ) ),
-                    product_variants ( name, price, sale_price )
-                `);
+				id, name, slug, price, sale_price, stock_quantity, created_at, is_bestseller, is_new_arrival, is_featured,
+				brands ( slug, name ),
+				product_images ( url, is_primary ),
+				product_categories ( categories ( slug, name ) ),
+				product_skin_types ( skin_types ( slug, name ) ),
+				product_variants ( id, name, price, sale_price, stock_quantity )
+			`);
 
 			if (error) {
 				console.error("Error fetching products:", error);
@@ -249,7 +249,7 @@ export default function Shop() {
 
 					<aside className="shop-sidebar">
 						<div style={styles.filterSection}>
-							<h3 style={styles.filterTitle}>Max Price: ${maxPrice}</h3>
+							<h3 style={styles.filterTitle}>Max Price: ৳{maxPrice}</h3>
 							<input
 								type="range"
 								min="0"
@@ -259,8 +259,8 @@ export default function Shop() {
 								style={styles.slider}
 							/>
 							<div style={styles.sliderLabels}>
-								<span>$0</span>
-								<span>${absoluteMaxPrice}</span>
+								<span>৳0</span>
+								<span>৳{absoluteMaxPrice}</span>
 							</div>
 						</div>
 

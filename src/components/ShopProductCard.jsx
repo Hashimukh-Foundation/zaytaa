@@ -49,10 +49,10 @@ export default function ShopProductCard({ product }) {
 		if (product.stock_quantity > 0) {
 			addToCart(product, product.product_variants?.[0] || null, 1);
 			setIsAdded(true);
-			setTimeout(() => setIsAdded(false), 2000); // Revert after 2s
+			// setTimeout(() => setIsAdded(false), 2000); // Revert after 2s
 			setToastMessage("Added to your bag.");
 		} else {
-			setToastMessage("Added to your bag.");
+			setToastMessage("Item is out of stock.");
 		}
 	};
 
@@ -113,10 +113,10 @@ export default function ShopProductCard({ product }) {
 
 					<div className="card-price-row">
 						<span className="price-active">
-							${(activeSalePrice || activePrice).toFixed(2)}
+							৳{(activeSalePrice || activePrice).toFixed(2)}
 						</span>
 						{hasSale && (
-							<span className="price-original">${activePrice.toFixed(2)}</span>
+							<span className="price-original">৳{activePrice.toFixed(2)}</span>
 						)}
 					</div>
 

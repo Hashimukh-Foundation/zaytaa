@@ -5,6 +5,7 @@ import ProductCard from "../components/ProductCard";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
+import Toast from "../components/Toast";
 
 export default function ProductPage() {
 	const { slug } = useParams();
@@ -17,6 +18,7 @@ export default function ProductPage() {
 	const [selectedImage, setSelectedImage] = useState("");
 	const [quantity, setQuantity] = useState(1);
 	const [selectedVariant, setSelectedVariant] = useState(null);
+	const [toastMessage, setToastMessage] = useState(null);
 
 	useEffect(() => {
 		async function fetchProductData() {
@@ -128,16 +130,18 @@ export default function ProductPage() {
 
 			// Simple check before adding
 			if (product.stock_quantity > 0) {
-				addToCart(product, product.product_variants?.[0] || null, 1);
+				addToCart(product, selectedVariant, quantity);
 				setIsAdded(true);
-				setTimeout(() => setIsAdded(false), 2000); // Revert after 2s
+				// setTimeout(() => setIsAdded(false), 2000); // Revert after 2s
+				setToastMessage("Added to cart.");
 			} else {
-				alert("Out of stock!");
+				setToastMessage("Item is out of stock.");
 			}
 		};
 
 		return (
 			<div style={styles.container}>
+				<Toast message={toastMessage} onClose={() => setToastMessage(null)} />
 				<div style={styles.breadcrumbs}>
 					<Link to="/" style={styles.crumb}>
 						Home
@@ -229,14 +233,14 @@ export default function ProductPage() {
 							{currentSalePrice ? (
 								<>
 									<span style={styles.salePrice}>
-										${currentSalePrice.toFixed(2)}
+										৳{currentSalePrice.toFixed(2)}
 									</span>
 									<span style={styles.originalPrice}>
-										${currentPrice.toFixed(2)}
+										৳{currentPrice.toFixed(2)}
 									</span>
 								</>
 							) : (
-								<span style={styles.price}>${currentPrice.toFixed(2)}</span>
+								<span style={styles.price}>৳{currentPrice.toFixed(2)}</span>
 							)}
 						</div>
 

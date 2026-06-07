@@ -4,7 +4,8 @@ import { useCart } from "../context/CartContext";
 import { supabase } from "../supabaseClient";
 
 export default function Checkout() {
-	const { cart, cartTotal, clearCart } = useCart();
+	const { cart, cartTotal, clearCart, updateQuantity, removeFromCart } =
+		useCart();
 	const navigate = useNavigate();
 
 	// --- Form States ---
@@ -16,16 +17,26 @@ export default function Checkout() {
 		transactionId: "",
 	});
 
+	const [paymentMethod, setPaymentMethod] = useState("bkash"); // "bkash" | "cod"
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [errorMsg, setErrorMsg] = useState("");
 
 	// --- Success State ---
 	const [successId, setSuccessId] = useState(null);
 
+	// --- Order Lookup State ---
+	const [lookupId, setLookupId] = useState("");
+	const [lookupResult, setLookupResult] = useState(null);
+	const [lookupError, setLookupError] = useState("");
+	const [isLooking, setIsLooking] = useState(false);
+	const [txnUpdate, setTxnUpdate] = useState("");
+	const [txnSaved, setTxnSaved] = useState(false);
+	const [isSavingTxn, setIsSavingTxn] = useState(false);
+
 	// Helper: Generate a secure 8-character ID
 	const generateDisplayId = () => {
 		const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-		let result = "AXIO-";
+		let result = "ZYT-";
 		for (let i = 0; i < 6; i++) {
 			result += chars.charAt(Math.floor(Math.random() * chars.length));
 		}
@@ -47,6 +58,13 @@ export default function Checkout() {
 			return;
 		}
 
+		// bKash requires a transaction ID
+		if (paymentMethod === "bkash" && !formData.transactionId.trim()) {
+			setErrorMsg("Please enter your bKash/Nagad transaction ID.");
+			setIsSubmitting(false);
+			return;
+		}
+
 		try {
 			const displayId = generateDisplayId();
 
@@ -61,9 +79,9 @@ export default function Checkout() {
 						customer_phone: formData.phone,
 						shipping_address: formData.address,
 						total_amount: cartTotal,
-						transaction_id: formData.transactionId,
+						transaction_id: formData.transactionId.trim() || null,
 						status: "Pending",
-						payment_method: "Manual",
+						payment_method: paymentMethod === "cod" ? "COD" : "Manual",
 					},
 				])
 				.select()
@@ -73,11 +91,11 @@ export default function Checkout() {
 
 			// 2. Prepare and insert the individual Order Items
 			const orderItems = cart.map((item) => ({
-				order_id: orderData.id, // Ties it to the order we just created
+				order_id: orderData.id,
 				product_id: item.product_id,
 				variant_id: item.variant_id,
 				quantity: item.quantity,
-				price_at_purchase: item.price, // Locks in the exact price they paid
+				price_at_purchase: item.price,
 			}));
 
 			const { error: itemsError } = await supabase
@@ -99,6 +117,59 @@ export default function Checkout() {
 		}
 	};
 
+	// --- Order Lookup ---
+	const handleLookup = async (e) => {
+		e.preventDefault();
+		const id = lookupId.trim().toUpperCase();
+		if (!id) return;
+		setLookupError("");
+		setLookupResult(null);
+		setTxnSaved(false);
+		setTxnUpdate("");
+		setIsLooking(true);
+		try {
+			const { data, error } = await supabase
+				.from("orders")
+				.select(
+					"id, display_id, status, total_amount, payment_method, transaction_id, created_at",
+				)
+				.eq("display_id", id)
+				.maybeSingle();
+
+			if (error) throw error;
+			if (!data) {
+				setLookupError(
+					"No order found with that ID. Please check and try again.",
+				);
+			} else {
+				setLookupResult(data);
+				setTxnUpdate(data.transaction_id || "");
+			}
+		} catch (err) {
+			setLookupError("Something went wrong. Please try again.");
+		} finally {
+			setIsLooking(false);
+		}
+	};
+
+	const handleSaveTxn = async () => {
+		if (!lookupResult || !txnUpdate.trim()) return;
+		setIsSavingTxn(true);
+		try {
+			const { error } = await supabase
+				.from("orders")
+				.update({ transaction_id: txnUpdate.trim() })
+				.eq("id", lookupResult.id);
+			if (error) throw error;
+			setTxnSaved(true);
+			setLookupResult({ ...lookupResult, transaction_id: txnUpdate.trim() });
+		} catch (err) {
+			setLookupError("Could not save transaction ID. Please try again.");
+		} finally {
+			setIsSavingTxn(false);
+		}
+	};
+
 	// --- SUCCESS SCREEN ---
 	if (successId) {
 		return (
@@ -106,7 +177,7 @@ export default function Checkout() {
 				<div style={styles.successCard}>
 					<h1 style={styles.title}>Order Received!</h1>
 					<p style={styles.bodyText}>
-						Thank you for shopping with us. We are reviewing your transaction.
+						Thank you for shopping with us. We are reviewing your order.
 					</p>
 
 					<div style={styles.idBox}>
@@ -115,7 +186,8 @@ export default function Checkout() {
 					</div>
 
 					<p style={{ ...styles.bodyText, fontSize: "14px" }}>
-						Please save this ID. You can use it to check your order status.
+						Please save this ID. You can use it to check your order status
+						below.
 					</p>
 
 					<Link to="/shop" style={styles.btnPrimary}>
@@ -146,6 +218,125 @@ export default function Checkout() {
 					>
 						Return to Shop
 					</Link>
+
+					{/* Order Lookup */}
+					<div style={styles.lookupBox}>
+						<h2
+							style={{
+								...styles.sectionTitle,
+								textAlign: "center",
+								marginBottom: "8px",
+							}}
+						>
+							Track Your Order
+						</h2>
+						<p
+							style={{
+								...styles.bodyText,
+								fontSize: "13px",
+								textAlign: "center",
+								marginBottom: "16px",
+							}}
+						>
+							Enter your order ID to check status or add a transaction ID.
+						</p>
+						<form
+							onSubmit={handleLookup}
+							style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
+						>
+							<input
+								type="text"
+								value={lookupId}
+								onChange={(e) => setLookupId(e.target.value)}
+								placeholder="e.g. ZYT-AB2CD3"
+								style={{ ...styles.input, flex: 1, minWidth: "200px" }}
+							/>
+							<button
+								type="submit"
+								disabled={isLooking}
+								style={styles.btnPrimary}
+							>
+								{isLooking ? "Searching..." : "Find Order"}
+							</button>
+						</form>
+						{lookupError && (
+							<div style={{ ...styles.errorBox, marginTop: "12px" }}>
+								{lookupError}
+							</div>
+						)}
+						{lookupResult && (
+							<div style={styles.lookupResult}>
+								<div style={styles.lookupRow}>
+									<span style={styles.lookupLabel}>Order ID</span>
+									<span style={styles.lookupValue}>
+										{lookupResult.display_id}
+									</span>
+								</div>
+								<div style={styles.lookupRow}>
+									<span style={styles.lookupLabel}>Status</span>
+									<span
+										style={{
+											...styles.lookupValue,
+											color: "var(--green)",
+											fontWeight: 700,
+										}}
+									>
+										{lookupResult.status}
+									</span>
+								</div>
+								<div style={styles.lookupRow}>
+									<span style={styles.lookupLabel}>Total</span>
+									<span style={styles.lookupValue}>
+										৳{Number(lookupResult.total_amount).toFixed(2)}
+									</span>
+								</div>
+								<div style={styles.lookupRow}>
+									<span style={styles.lookupLabel}>Payment</span>
+									<span style={styles.lookupValue}>
+										{lookupResult.payment_method}
+									</span>
+								</div>
+								{lookupResult.transaction_id && (
+									<div style={styles.lookupRow}>
+										<span style={styles.lookupLabel}>Transaction ID</span>
+										<span style={styles.lookupValue}>
+											{lookupResult.transaction_id}
+										</span>
+									</div>
+								)}
+								{/* Allow adding transaction ID if missing or updating */}
+								<div style={{ marginTop: "16px" }}>
+									<label style={styles.label}>
+										{lookupResult.transaction_id
+											? "Update Transaction ID"
+											: "Add Transaction ID"}
+									</label>
+									<div
+										style={{ display: "flex", gap: "10px", marginTop: "8px" }}
+									>
+										<input
+											type="text"
+											value={txnUpdate}
+											onChange={(e) => setTxnUpdate(e.target.value)}
+											placeholder="e.g. 8A7B6C5D4E"
+											style={{ ...styles.input, flex: 1 }}
+										/>
+										<button
+											onClick={handleSaveTxn}
+											disabled={isSavingTxn || !txnUpdate.trim() || txnSaved}
+											style={styles.btnPrimary}
+										>
+											{txnSaved
+												? "Saved ✓"
+												: isSavingTxn
+													? "Saving..."
+													: "Save"}
+										</button>
+									</div>
+								</div>
+							</div>
+						)}
+					</div>
 				</div>
 			) : (
 				<div style={styles.checkoutGrid}>
@@ -209,33 +400,93 @@ export default function Checkout() {
 						</div>
 
 						<h2 style={{ ...styles.sectionTitle, marginTop: "40px" }}>
-							Payment Information
+							Payment Method
 						</h2>
-						<div style={styles.paymentBox}>
-							<p
+
+						{/* Payment Method Toggle */}
+						<div style={styles.paymentToggle}>
+							<button
+								type="button"
+								onClick={() => setPaymentMethod("bkash")}
 								style={{
-									...styles.bodyText,
-									marginBottom: "16px",
-									fontSize: "14px",
+									...styles.paymentOption,
+									...(paymentMethod === "bkash"
+										? styles.paymentOptionActive
+										: {}),
 								}}
 							>
-								Please send exactly <strong>${cartTotal.toFixed(2)}</strong> via
-								bKash to <strong>01XXXXXXXXX</strong>. Enter the transaction ID
-								below to verify your order.
-							</p>
-							<div style={styles.inputGroup}>
-								<label style={styles.label}>Transaction ID (bKash/Nagad)</label>
-								<input
-									required
-									type="text"
-									name="transactionId"
-									placeholder="e.g. 8A7B6C5D4E"
-									value={formData.transactionId}
-									onChange={handleInputChange}
-									style={styles.input}
-								/>
-							</div>
+								<span style={styles.paymentIcon}>💳</span>
+								<div>
+									<div style={styles.paymentOptionTitle}>bKash / Nagad</div>
+									<div style={styles.paymentOptionSub}>
+										Mobile banking transfer
+									</div>
+								</div>
+							</button>
+							<button
+								type="button"
+								onClick={() => setPaymentMethod("cod")}
+								style={{
+									...styles.paymentOption,
+									...(paymentMethod === "cod"
+										? styles.paymentOptionActive
+										: {}),
+								}}
+							>
+								<span style={styles.paymentIcon}>🏠</span>
+								<div>
+									<div style={styles.paymentOptionTitle}>Cash on Delivery</div>
+									<div style={styles.paymentOptionSub}>
+										Pay when you receive
+									</div>
+								</div>
+							</button>
 						</div>
+
+						{/* bKash payment box */}
+						{paymentMethod === "bkash" && (
+							<div style={styles.paymentBox}>
+								<p
+									style={{
+										...styles.bodyText,
+										marginBottom: "16px",
+										fontSize: "14px",
+									}}
+								>
+									Please send exactly <strong>৳{cartTotal.toFixed(2)}</strong>{" "}
+									via bKash/Nagad to <strong>01XXXXXXXXX</strong>. Enter the
+									transaction ID below to verify your order.
+								</p>
+								<div style={styles.inputGroup}>
+									<label style={styles.label}>
+										Transaction ID (bKash/Nagad){" "}
+										<span style={styles.optionalBadge}>optional</span>
+									</label>
+									<input
+										type="text"
+										name="transactionId"
+										placeholder="e.g. 8A7B6C5D4E"
+										value={formData.transactionId}
+										onChange={handleInputChange}
+										style={styles.input}
+									/>
+									<span style={{ fontSize: "12px", color: "var(--stone)" }}>
+										You can add this later using your order tracking ID.
+									</span>
+								</div>
+							</div>
+						)}
+
+						{/* COD info box */}
+						{paymentMethod === "cod" && (
+							<div style={styles.paymentBox}>
+								<p style={{ ...styles.bodyText, fontSize: "14px" }}>
+									Your order will be delivered to your address. Please have{" "}
+									<strong>৳{cartTotal.toFixed(2)}</strong> ready in cash when
+									the delivery arrives.
+								</p>
+							</div>
+						)}
 
 						{errorMsg && <div style={styles.errorBox}>{errorMsg}</div>}
 
@@ -246,7 +497,7 @@ export default function Checkout() {
 						>
 							{isSubmitting
 								? "Processing..."
-								: `Place Order - $${cartTotal.toFixed(2)}`}
+								: `Place Order — ৳${cartTotal.toFixed(2)}`}
 						</button>
 					</form>
 
@@ -268,10 +519,51 @@ export default function Checkout() {
 												Size: {item.variant_name}
 											</div>
 										)}
-										<div style={styles.itemQty}>Qty: {item.quantity}</div>
+										{/* Quantity controls */}
+										<div style={styles.qtyControls}>
+											<button
+												type="button"
+												style={styles.qtyBtn}
+												onClick={() => {
+													if (item.quantity <= 1)
+														removeFromCart(item.cartItemId);
+													else
+														updateQuantity(item.cartItemId, item.quantity - 1);
+												}}
+											>
+												−
+											</button>
+											<span style={styles.qtyNum}>{item.quantity}</span>
+											<button
+												type="button"
+												style={styles.qtyBtn}
+												disabled={item.quantity >= (item.maxStock || 99)}
+												onClick={() =>
+													updateQuantity(item.cartItemId, item.quantity + 1)
+												}
+											>
+												+
+											</button>
+										</div>
 									</div>
-									<div style={styles.itemPrice}>
-										${(item.price * item.quantity).toFixed(2)}
+									<div
+										style={{
+											display: "flex",
+											flexDirection: "column",
+											alignItems: "flex-end",
+											gap: "8px",
+										}}
+									>
+										<div style={styles.itemPrice}>
+											৳{(item.price * item.quantity).toFixed(2)}
+										</div>
+										<button
+											type="button"
+											style={styles.removeBtn}
+											onClick={() => removeFromCart(item.cartItemId)}
+										>
+											Remove
+										</button>
 									</div>
 								</div>
 							))}
@@ -279,7 +571,7 @@ export default function Checkout() {
 
 						<div style={styles.totalRow}>
 							<span>Total</span>
-							<strong>${cartTotal.toFixed(2)}</strong>
+							<strong>৳{cartTotal.toFixed(2)}</strong>
 						</div>
 					</div>
 				</div>
@@ -337,6 +629,19 @@ const styles = {
 		color: "var(--ink)",
 		textTransform: "uppercase",
 		letterSpacing: "0.05em",
+		display: "flex",
+		alignItems: "center",
+		gap: "8px",
+	},
+	optionalBadge: {
+		fontWeight: 400,
+		fontSize: "11px",
+		background: "#f4f3f0",
+		color: "var(--stone)",
+		padding: "2px 6px",
+		borderRadius: "4px",
+		textTransform: "none",
+		letterSpacing: 0,
 	},
 	input: {
 		padding: "12px 16px",
@@ -348,11 +653,50 @@ const styles = {
 		background: "#fcfbf8",
 	},
 
+	paymentToggle: {
+		display: "grid",
+		gridTemplateColumns: "1fr 1fr",
+		gap: "12px",
+	},
+	paymentOption: {
+		display: "flex",
+		alignItems: "center",
+		gap: "12px",
+		padding: "16px",
+		border: "2px solid var(--border)",
+		borderRadius: "8px",
+		background: "#fcfbf8",
+		cursor: "pointer",
+		textAlign: "left",
+		transition: "border-color 0.2s",
+		fontFamily: "var(--font-sans)",
+	},
+	paymentOptionActive: {
+		borderColor: "var(--ink)",
+		background: "white",
+	},
+	paymentIcon: { fontSize: "24px" },
+	paymentOptionTitle: {
+		fontFamily: "var(--font-sans)",
+		fontSize: "14px",
+		fontWeight: 700,
+		color: "var(--ink)",
+	},
+	paymentOptionSub: {
+		fontFamily: "var(--font-sans)",
+		fontSize: "12px",
+		color: "var(--stone)",
+		marginTop: "2px",
+	},
+
 	paymentBox: {
 		background: "#f4f3f0",
 		border: "1px solid var(--border)",
 		borderRadius: "8px",
 		padding: "24px",
+		display: "flex",
+		flexDirection: "column",
+		gap: "12px",
 	},
 	errorBox: {
 		padding: "12px",
@@ -392,8 +736,9 @@ const styles = {
 		objectFit: "cover",
 		borderRadius: "6px",
 		background: "#f4f3f0",
+		flexShrink: 0,
 	},
-	itemInfo: { flex: 1, display: "flex", flexDirection: "column", gap: "4px" },
+	itemInfo: { flex: 1, display: "flex", flexDirection: "column", gap: "6px" },
 	itemName: {
 		fontFamily: "var(--font-sans)",
 		fontSize: "14px",
@@ -405,16 +750,51 @@ const styles = {
 		fontSize: "12px",
 		color: "var(--stone)",
 	},
-	itemQty: {
+	qtyControls: {
+		display: "flex",
+		alignItems: "center",
+		gap: "8px",
+		marginTop: "4px",
+	},
+	qtyBtn: {
+		width: "28px",
+		height: "28px",
+		border: "1px solid var(--border)",
+		borderRadius: "4px",
+		background: "white",
+		color: "var(--ink)",
 		fontFamily: "var(--font-sans)",
-		fontSize: "12px",
-		color: "var(--stone)",
+		fontSize: "16px",
+		fontWeight: 600,
+		cursor: "pointer",
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		lineHeight: 1,
+	},
+	qtyNum: {
+		fontFamily: "var(--font-sans)",
+		fontSize: "14px",
+		fontWeight: 600,
+		color: "var(--ink)",
+		minWidth: "20px",
+		textAlign: "center",
 	},
 	itemPrice: {
 		fontFamily: "var(--font-sans)",
 		fontSize: "15px",
 		fontWeight: 600,
 		color: "var(--ink)",
+	},
+	removeBtn: {
+		background: "none",
+		border: "none",
+		fontFamily: "var(--font-sans)",
+		fontSize: "12px",
+		color: "#c94040",
+		cursor: "pointer",
+		padding: 0,
+		textDecoration: "underline",
 	},
 
 	totalRow: {
@@ -442,6 +822,7 @@ const styles = {
 		cursor: "pointer",
 		textAlign: "center",
 		textDecoration: "none",
+		display: "inline-block",
 	},
 
 	successCard: {
@@ -476,5 +857,46 @@ const styles = {
 		fontSize: "32px",
 		color: "var(--ink)",
 		letterSpacing: "0.05em",
+	},
+
+	lookupBox: {
+		maxWidth: "520px",
+		margin: "40px auto 0",
+		padding: "32px",
+		border: "1px solid var(--border)",
+		borderRadius: "12px",
+		background: "#fcfbf8",
+		textAlign: "left",
+	},
+	lookupResult: {
+		marginTop: "20px",
+		padding: "20px",
+		background: "white",
+		border: "1px solid var(--border)",
+		borderRadius: "8px",
+		display: "flex",
+		flexDirection: "column",
+		gap: "12px",
+	},
+	lookupRow: {
+		display: "flex",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingBottom: "8px",
+		borderBottom: "1px solid var(--border)",
+	},
+	lookupLabel: {
+		fontFamily: "var(--font-sans)",
+		fontSize: "12px",
+		fontWeight: 600,
+		color: "var(--stone)",
+		textTransform: "uppercase",
+		letterSpacing: "0.05em",
+	},
+	lookupValue: {
+		fontFamily: "var(--font-sans)",
+		fontSize: "14px",
+		fontWeight: 600,
+		color: "var(--ink)",
 	},
 };
