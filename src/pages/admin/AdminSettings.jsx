@@ -5,41 +5,56 @@ export default function AdminSettings() {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 
-	// Form states
+	// --- Site Form States ---
 	const [shopTitle, setShopTitle] = useState("");
 	const [shopSubtitle, setShopSubtitle] = useState("");
 	const [announcement, setAnnouncement] = useState("");
 	const [homeTitle, setHomeTitle] = useState("");
 	const [homeSubtitle, setHomeSubtitle] = useState("");
 
+	// --- NEW: Courier & Payment Form States ---
+	const [insideDhaka, setInsideDhaka] = useState(60);
+	const [outsideDhaka, setOutsideDhaka] = useState(120);
+	const [bkashNumber, setBkashNumber] = useState("");
+
 	useEffect(() => {
 		async function fetchSettings() {
 			setLoading(true);
 
-			// Fetch all settings from your key-value table
-			const { data, error } = await supabase
-				.from("site_settings")
-				.select("key, value");
+			// Fetch both tables simultaneously
+			const [siteResponse, courierResponse] = await Promise.all([
+				supabase.from("site_settings").select("key, value"),
+				supabase.from("courier_fee").select("*").eq("id", 1).single(),
+			]);
 
-			if (error) {
-				console.error("Error fetching settings:", error);
-			} else if (data) {
-				// Turn the array of rows into a dictionary: { shop_title: "Shop All", ... }
-				const settingsMap = data.reduce((acc, row) => {
+			if (siteResponse.error)
+				console.error("Error fetching site settings:", siteResponse.error);
+			if (courierResponse.error)
+				console.error("Error fetching courier fees:", courierResponse.error);
+
+			// Populate Site Settings
+			if (siteResponse.data) {
+				const settingsMap = siteResponse.data.reduce((acc, row) => {
 					acc[row.key] = row.value;
 					return acc;
 				}, {});
 
-				// Populate the form fields if the keys exist
 				setShopTitle(settingsMap["shop_title"] || "Shop All");
 				setShopSubtitle(settingsMap["shop_subtitle"] || "");
 				setAnnouncement(settingsMap["announcement_bar"] || "");
-
 				setHomeTitle(settingsMap["home_title"] || "Welcome to Axiolab");
 				setHomeSubtitle(
 					settingsMap["home_subtitle"] || "Discover the best skincare.",
 				);
 			}
+
+			// Populate Courier Fees
+			if (courierResponse.data) {
+				setInsideDhaka(courierResponse.data.inside_dhaka);
+				setOutsideDhaka(courierResponse.data.outside_dhaka);
+				setBkashNumber(courierResponse.data.bkash_number);
+			}
+
 			setLoading(false);
 		}
 		fetchSettings();
@@ -49,7 +64,6 @@ export default function AdminSettings() {
 		e.preventDefault();
 		setSaving(true);
 
-		// Prepare an array of objects matching your exact site_settings schema
 		const updates = [
 			{
 				key: "shop_title",
@@ -69,7 +83,6 @@ export default function AdminSettings() {
 				label: "Announcement Bar",
 				group_name: "Global",
 			},
-
 			{
 				key: "home_title",
 				value: homeTitle,
@@ -84,13 +97,23 @@ export default function AdminSettings() {
 			},
 		];
 
-		// Upsert uses your "site_settings_key_key" unique constraint to update if it exists, or insert if it doesn't!
-		const { error } = await supabase
-			.from("site_settings")
-			.upsert(updates, { onConflict: "key" });
+		// Save to both tables simultaneously
+		const [siteSave, courierSave] = await Promise.all([
+			supabase.from("site_settings").upsert(updates, { onConflict: "key" }),
+			supabase
+				.from("courier_fee")
+				.update({
+					inside_dhaka: Number(insideDhaka),
+					outside_dhaka: Number(outsideDhaka),
+					bkash_number: bkashNumber,
+				})
+				.eq("id", 1),
+		]);
 
-		if (error) {
-			alert("Error saving settings: " + error.message);
+		if (siteSave.error || courierSave.error) {
+			alert("Error saving settings. Please check console.");
+			console.error("Site Save Error:", siteSave.error);
+			console.error("Courier Save Error:", courierSave.error);
 		} else {
 			alert("Settings updated successfully!");
 		}
@@ -112,12 +135,13 @@ export default function AdminSettings() {
 						fontSize: "15px",
 					}}
 				>
-					Update the main text displayed across your storefront.
+					Update your storefront text, delivery charges, and payment
+					information.
 				</p>
 			</div>
 
 			<form onSubmit={handleSave} style={styles.formCard}>
-				{/* ---> NEW: Homepage Settings UI <--- */}
+				{/* --- SITE SETTINGS --- */}
 				<h3 style={styles.sectionTitle}>Homepage Hero</h3>
 				<div style={styles.inputRow}>
 					<div style={styles.inputGroup}>
@@ -143,14 +167,8 @@ export default function AdminSettings() {
 					</div>
 				</div>
 
-				<hr
-					style={{
-						border: "none",
-						borderTop: "1px solid var(--border)",
-						margin: "32px 0",
-					}}
-				/>
-				{/* ... existing Shop Page Headers UI ... */}
+				<hr style={styles.divider} />
+
 				<h3 style={styles.sectionTitle}>Shop Page Headers</h3>
 				<div style={styles.inputRow}>
 					<div style={styles.inputGroup}>
@@ -178,13 +196,7 @@ export default function AdminSettings() {
 					</div>
 				</div>
 
-				<hr
-					style={{
-						border: "none",
-						borderTop: "1px solid var(--border)",
-						margin: "32px 0",
-					}}
-				/>
+				<hr style={styles.divider} />
 
 				<h3 style={styles.sectionTitle}>Global Elements</h3>
 				<div style={styles.inputRow}>
@@ -200,9 +212,49 @@ export default function AdminSettings() {
 					</div>
 				</div>
 
+				<hr style={styles.divider} />
+
+				{/* --- COURIER & PAYMENT SETTINGS --- */}
+				<h3 style={styles.sectionTitle}>Courier Fees & Payment</h3>
+				<div style={styles.inputRow}>
+					<div style={styles.inputGroup}>
+						<label style={styles.label}>Inside Dhaka Fee (৳)</label>
+						<input
+							type="number"
+							value={insideDhaka}
+							onChange={(e) => setInsideDhaka(e.target.value)}
+							style={styles.input}
+							required
+						/>
+					</div>
+					<div style={styles.inputGroup}>
+						<label style={styles.label}>Outside Dhaka Fee (৳)</label>
+						<input
+							type="number"
+							value={outsideDhaka}
+							onChange={(e) => setOutsideDhaka(e.target.value)}
+							style={styles.input}
+							required
+						/>
+					</div>
+				</div>
+				<div style={styles.inputRow}>
+					<div style={styles.inputGroup}>
+						<label style={styles.label}>bKash / Nagad Number</label>
+						<input
+							type="text"
+							value={bkashNumber}
+							onChange={(e) => setBkashNumber(e.target.value)}
+							style={styles.input}
+							placeholder="e.g. 01712345678"
+							required
+						/>
+					</div>
+				</div>
+
 				<div style={{ marginTop: "32px" }}>
 					<button type="submit" style={styles.btnPrimary} disabled={saving}>
-						{saving ? "Saving Updates..." : "Save Settings"}
+						{saving ? "Saving Updates..." : "Save All Settings"}
 					</button>
 				</div>
 			</form>
@@ -257,5 +309,10 @@ const styles = {
 		fontWeight: 500,
 		cursor: "pointer",
 		transition: "opacity 0.2s",
+	},
+	divider: {
+		border: "none",
+		borderTop: "1px solid var(--border)",
+		margin: "32px 0",
 	},
 };

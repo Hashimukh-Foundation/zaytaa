@@ -18,25 +18,15 @@ export default function TrackOrder() {
 		setLoading(true);
 
 		try {
-			// 1. Fetch the order by its display_id
-			const { data: order, error: orderError } = await supabase
-				.from("orders")
-				.select(
-					`
-                    *,
-                    order_items (
-                        quantity,
-                        price_at_purchase,
-                        products ( name ),
-                        product_variants ( name )
-                    )
-                `,
-				)
-				.eq("display_id", trackingId.trim().toUpperCase())
-				.maybeSingle();
+			// ---> UPDATED: Calling the secure Postgres Function (RPC)
+			const { data: order, error: orderError } = await supabase.rpc(
+				"get_tracking_details",
+				{ tracking_id: trackingId.trim().toUpperCase() },
+			);
 
 			if (orderError) throw orderError;
 
+			// The RPC returns null if the tracking ID doesn't exist
 			if (!order) {
 				setErrorMsg(
 					"We couldn't find an order with that tracking ID. Please check it and try again.",

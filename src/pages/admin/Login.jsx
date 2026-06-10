@@ -30,7 +30,7 @@ export default function Login() {
 	return (
 		<div style={styles.container}>
 			<div style={styles.card}>
-				<h1 style={styles.heading}>LUMIÈRE Admin</h1>
+				<h1 style={styles.heading}>Zaytaa Admin</h1>
 				<p style={styles.subtext}>Sign in to manage your store.</p>
 
 				{error && <p style={styles.error}>{error}</p>}
